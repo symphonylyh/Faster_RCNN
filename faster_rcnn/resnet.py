@@ -1,20 +1,3 @@
-# import torch
-# import torch.nn as nn
-# import torchvision
-#
-# from config import Config as cfg
-#
-# class ResNet(nn.Module):
-#     """Faster Regional-CNN
-#     """
-#     def __init__(self):
-#         super(ResNet, self).__init__()
-#
-#     def forward(self, images):
-#         N, _, H, W = images.shape
-#         h, w = round(H/16.0), round(W/16.0)
-#         return torch.abs(torch.randn(N*1024*h*w).view(N,1024,h,w))
-
 """
 PyTorch's official Residual Net is embedded into our Faster R-CNN.
     - Source code of ResNet from [github](https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py).

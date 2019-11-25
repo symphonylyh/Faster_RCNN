@@ -8,7 +8,7 @@ import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 
-from model import *
+from faster_rcnn import FasterRCNN
 from config import Config as cfg
 from dataset import COCODataset, PascalDataset
 import rpn.utils
