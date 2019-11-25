@@ -5,7 +5,7 @@ from torch.autograd import Variable
 import numpy as np
 
 from config import Config as cfg
-from resnet import ResNet
+from resnet import resnet_loader
 from rpn.rpn import RPN
 from roi_pooling import RoIPooling
 from classification import Classification
@@ -16,10 +16,38 @@ class FasterRCNN(nn.Module):
     def __init__(self):
         super(FasterRCNN, self).__init__()
 
-        self.cnn = ResNet()
+        resnet = resnet_loader(arch='resnet101', pretrained=True)
+        # Part 1 layers from ResNet as feature extraction network
+        self.cnn1 = nn.Sequential(
+            resnet.conv1,
+            resnet.bn1,
+            resnet.relu,
+            resnet.maxpool,
+            resnet.layer1,
+            resnet.layer2,
+            resnet.layer3
+        )
+        # Freeze all pretrained layers
+        for param in self.cnn1.parameters():
+            param.requires_grad = False
+
+        # RPN network
         self.rpn = RPN()
+
+        # RoI Pooling
         self.pooling = RoIPooling()
-        self.classification = Classification()
+
+        # Part 2 layers from ResNet
+        self.cnn2 = nn.Sequential(
+            resnet.layer4,
+            nn.AvgPool2d(cfg.POOLING_SIZE) # 7
+        )
+        # This layer works on a different input feature maps, so I think it's better to train it
+        # for param in self.cnn2.parameters():
+        #     param.requires_grad = False
+
+        # Classification network
+        self.classification = Classification(self.cnn2) # include cnn2 in the classification network
 
     def forward(self, images, gt_boxes, gt_classes):
         """Forward step.
@@ -34,7 +62,7 @@ class FasterRCNN(nn.Module):
             rcnn_loss [float]: RCNN total loss
         """
         # 1. head CNN network (ResNet)
-        feature_map = self.cnn(images) # N x C x H x W
+        feature_map = self.cnn1(images) # N x C x H x W
 
         # 2. RPN network
         rois, gt_rois_labels, gt_rois_coeffs, rpn_loss = self.rpn(feature_map, gt_boxes, gt_classes)

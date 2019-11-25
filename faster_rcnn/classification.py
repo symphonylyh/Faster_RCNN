@@ -8,14 +8,11 @@ from config import Config as cfg
 class Classification(nn.Module):
     """Classification layer.
     """
-    def __init__(self):
+    def __init__(self, resnet):
         super(Classification, self).__init__()
 
-        # resnet layer 4
-        self.resnet = nn.Sequential(
-            nn.Conv2d(1024, 2048, 3, 1, 1),
-            nn.AvgPool2d(7)
-        )
+        # resnet layer 4 + Average pooling
+        self.resnet = resnet
 
         # fc layer1 to predict class score
         self.fc_rois_score = nn.Sequential(
@@ -26,20 +23,21 @@ class Classification(nn.Module):
         # fc layer2 to predict bbox regression coefficients
         self.fc_rois_coeff = nn.Linear(2048, 4 * cfg.NUM_CLASSES)
 
-
     def forward(self, crops):
         """Forward step.
         Args:
         Denote N*R == M
             crops [N x R x C x 7 x 7]: Feature maps of RoI after crop pooling.
-
+        Returns:
+            rois_score [N x R x 21]: class probability distribution
+            rois_coeff [N x R x 21*4]: class-specific bbox regression coefficients
         """
         # 0. flatten minibatch dimension
         # PyTorch can't take higher dimension tensor than minibatch, so we collapse N x R to M
         N, R = crops.shape[:2]
         crops = crops.view(-1, *crops.shape[2:]) # M x C x 7 x 7
 
-        # 1. resnet layer4, avgpool, averaging
+        # 1. resNet layer 4 + average pooling + averaging along dim 3 & 2
         fc = self.resnet(crops).mean(3).mean(2) # average pooling size dimension, M x 2048
 
         # 2. fc to generate predicted class score and bbox coeff
