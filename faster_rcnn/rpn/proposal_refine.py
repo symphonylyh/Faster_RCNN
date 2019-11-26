@@ -1,3 +1,12 @@
+"""
+Faster R-CNN
+Proposal Refinement Layer.
+
+Copyright (c) 2019 Haohang Huang
+Licensed under the MIT License (see LICENSE for details)
+Written by Haohang Huang, November 2019.
+"""
+
 import torch
 import torch.nn as nn
 
@@ -44,8 +53,8 @@ class ProposalRefine(nn.Module):
         # bg_roi_labels: N x C boolean, True when this roi is bg
         # bg_gt_match_idx: we don't care about this, since no match for bg RoIs
 
-        rois_selected_idx = torch.zeros(gt_boxes.size(0), cfg.RPN_TOTAL_ROIS, dtype=torch.long) # N x RPN_TOTAL_ROIS (R), index in C (RoI)
-        gt_match_idx = torch.zeros(gt_boxes.size(0), cfg.RPN_TOTAL_ROIS, dtype=torch.long) # N x RPN_TOTAL_ROIS (R), index in B (matched gt box)
+        rois_selected_idx = torch.zeros(gt_boxes.size(0), cfg.RPN_TOTAL_ROIS, dtype=torch.long).to(rois.device) # N x RPN_TOTAL_ROIS (R), index in C (RoI)
+        gt_match_idx = torch.zeros(gt_boxes.size(0), cfg.RPN_TOTAL_ROIS, dtype=torch.long).to(rois.device) # N x RPN_TOTAL_ROIS (R), index in B (matched gt box)
 
         # 5. adjust excessive fg/bg RoIs
         max_fg = int(cfg.RPN_FG_ROI_FRACTION * cfg.RPN_TOTAL_ROIS)
@@ -90,7 +99,7 @@ class ProposalRefine(nn.Module):
         # 7. zero-out background RoIs, no class/coeff for them in loss
         rois_labels[:,max_fg:] = 0
         # reconstruct rois_coeffs to have 21*4 format
-        rois_coeffs_all = torch.zeros(*rois_labels.shape, cfg.NUM_CLASSES * 4)
+        rois_coeffs_all = torch.zeros(*rois_labels.shape, cfg.NUM_CLASSES * 4).to(rois.device)
         for n in range(rois_labels.size(0)): # N
             for r in range(max_fg): # R upto max_fg
                 l = rois_labels[n,r]

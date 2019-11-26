@@ -1,3 +1,12 @@
+"""
+Faster R-CNN
+RoI Pooling Layer.
+
+Copyright (c) 2019 Haohang Huang
+Licensed under the MIT License (see LICENSE for details)
+Written by Haohang Huang, November 2019.
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -32,7 +41,7 @@ class RoIPooling(nn.Module):
         [0 b ty] == [0 (y2-y1)/(H-1) (y1+y2-H+1)/(H-1)]
         """
         N, C, H, W = feature_map.shape
-        theta = torch.zeros(rois.size(0), rois.size(1), 2, 3) # N x R x 2 x 3, each RoI has a transform matrix
+        theta = torch.zeros(rois.size(0), rois.size(1), 2, 3).to(rois.device) # N x R x 2 x 3, each RoI has a transform matrix
         theta[:,:,0,0] = (x2 - x1) / (W - 1)
         theta[:,:,0,2] = (x1 + x2 - W + 1) / (W - 1)
         theta[:,:,1,1] = (y2 - y1) / (H - 1)
@@ -40,7 +49,7 @@ class RoIPooling(nn.Module):
 
         # 3. crop pooling from the feature map
         R = rois.size(1)
-        crops = torch.empty(N, R, C, cfg.POOLING_SIZE, cfg.POOLING_SIZE)
+        crops = torch.empty(N, R, C, cfg.POOLING_SIZE, cfg.POOLING_SIZE).to(rois.device)
         if not max_pool:
             for n in range(N):
                 # Note: PyTorch's affine_grid can't accept 4D theta

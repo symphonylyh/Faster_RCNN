@@ -1,4 +1,13 @@
 """
+Faster R-CNN
+Residual Network.
+
+Copyright (c) 2019 Haohang Huang
+Licensed under the MIT License (see LICENSE for details)
+Written by Haohang Huang, November 2019.
+"""
+
+"""
 PyTorch's official Residual Net is embedded into our Faster R-CNN.
     - Source code of ResNet from [github](https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py).
     - ResNet(): self.layer4. `stride` is modified from 2 to 1 to avoid the downsampling at layer 4, since it will scale 7x7 crop pooling size to 4x4 and can't continue with avgpool2d(7) layer after it in Faster RCNN.

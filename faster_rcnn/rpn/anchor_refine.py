@@ -1,3 +1,12 @@
+"""
+Faster R-CNN
+Anchor Refinement Layer.
+
+Copyright (c) 2019 Haohang Huang
+Licensed under the MIT License (see LICENSE for details)
+Written by Haohang Huang, November 2019.
+"""
+
 import torch
 import torch.nn as nn
 
@@ -52,7 +61,7 @@ class AnchorRefine(nn.Module):
         # logic trick: first check if there are any IoU exceeds lower threshold, then negate (~) the boolean
 
         # 4. assign labels to the anchors: 1 is positive, 0 is negative, -1 is dont care. Dont care anchors is not included in RPN loss.
-        labels = torch.empty(gt_boxes.size(0), pred_boxes.size(0)).fill_(-1) # N x X
+        labels = torch.empty(gt_boxes.size(0), pred_boxes.size(0)).fill_(-1).to(gt_boxes.device) # N x X
 
         # background label
         labels[negative_box_idx] = 0

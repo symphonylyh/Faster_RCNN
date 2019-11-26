@@ -1,4 +1,13 @@
+"""
+Faster R-CNN
+Model Configurations.
 
+Copyright (c) 2019 Haohang Huang
+Licensed under the MIT License (see LICENSE for details)
+Written by Haohang Huang, November 2019.
+"""
+
+import torch
 
 class Config():
     """
@@ -7,6 +16,9 @@ class Config():
     # =========================================================================
     # Dataset Parameters
     # =========================================================================
+    # device
+    DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     # input image size
     IMG_SIZE = (600, 800)
 

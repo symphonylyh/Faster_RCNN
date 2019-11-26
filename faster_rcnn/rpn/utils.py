@@ -1,5 +1,10 @@
 """
-Common operations in RPN.
+Faster R-CNN
+Common utilities in RPN.
+
+Copyright (c) 2019 Haohang Huang
+Licensed under the MIT License (see LICENSE for details)
+Written by Haohang Huang, November 2019.
 """
 
 import torch

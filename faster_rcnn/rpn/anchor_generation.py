@@ -1,5 +1,13 @@
 """
+Faster R-CNN
 Anchor Generation Layer.
+
+Copyright (c) 2019 Haohang Huang
+Licensed under the MIT License (see LICENSE for details)
+Written by Haohang Huang, November 2019.
+"""
+
+"""
 Idea:
     1. First generate a sample set of anchors with scales and ratios that works for a [stride x stride] region.
     2. Slide the sample anchor set over the entire image (offset = stride, we only need to add the offset to the corners of sample anchor set. That's why we first generated a sample set s.t. reduce computing redundancy)
@@ -67,7 +75,7 @@ class AnchorGeneration():
                       offset.reshape(offset.shape[0], 1, offset.shape[1]) # N x 9 x 4
         anchors_all = anchors_all.reshape(-1,4) # N*9 x 4
 
-        return torch.from_numpy(anchors_all).type(torch.FloatTensor) # from_numpy will inherit numpy as DoubleTensor, where PyTorch use FloatTensor by default
+        return torch.from_numpy(anchors_all).type(torch.FloatTensor) # from_numpy will inherit numpy as DoubleTensor, where PyTorch use FloatTensor by default. Note: this variable should later be moved to GPU (see rpn/rpn.py)
 
 if __name__ == '__main__':
     print(">>> Testing")

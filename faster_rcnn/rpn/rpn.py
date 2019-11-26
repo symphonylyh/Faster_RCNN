@@ -1,3 +1,12 @@
+"""
+Faster R-CNN
+Region Proposal Network.
+
+Copyright (c) 2019 Haohang Huang
+Licensed under the MIT License (see LICENSE for details)
+Written by Haohang Huang, November 2019.
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -35,7 +44,7 @@ class RPN(nn.Module):
                                         stride=cfg.RPN_ANCHOR_STRIDE,
                                         scales=cfg.RPN_ANCHOR_SCALES,
                                         ratios=cfg.RPN_ANCHOR_RATIOS
-                                        ).generate_all()
+                                        ).generate_all().to(cfg.DEVICE) # move to device
 
         # normal conv layer to reduce channel from 1024-->512
         self.conv = nn.Sequential(

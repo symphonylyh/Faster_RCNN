@@ -1,5 +1,10 @@
 """
-Train Faster R-CNN.
+Faster R-CNN
+Training.
+
+Copyright (c) 2019 Haohang Huang
+Licensed under the MIT License (see LICENSE for details)
+Written by Haohang Huang, November 2019.
 """
 
 import torch
@@ -13,15 +18,13 @@ from config import Config as cfg
 from dataset import COCODataset, PascalDataset
 import rpn.utils
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = cfg.DEVICE
 num_epochs = cfg.NUM_EPOCHS
 batch_size = cfg.BATCH_SIZE
 learning_rate = cfg.LEARNING_RATE
 
 #trainloader, testloader = get_dataloader(dataset='COCO')
 model = FasterRCNN().to(device)
-loss_cross_entropy = nn.CrossEntropyLoss()
-loss_smooth_l1 = nn.SmoothL1Loss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=3, verbose=True) # dynamic LR scheduler
 
@@ -38,13 +41,15 @@ def main():
         gt_boxes[:,:,3] = 50
         gt_classes = torch.randint(0,20, (batch_size,20))
 
+        images, gt_boxes, gt_classes = images.to(device), gt_boxes.to(device), gt_classes.to(device)
+
         # Train
         print("Training...", end='', flush=True)
         model.train()
         train_loss, total, correct = 0, 0, 0
         #for batch_idx, (images, gt_boxes) in enumerate(trainloader):
             #images, gt_boxes = images.to(device), gt_boxes.to(device)
-        for step in range(2):
+        for step in range(10):
 
             optimizer.zero_grad() # reset gradient
             rois, pred_rois_classes, pred_rois_coeffs, rcnn_loss = model(images, gt_boxes, gt_classes) # forward step
@@ -55,7 +60,7 @@ def main():
             #    rois = rpn.utils.bbox_transform(rois, pred_rois_coeffs)
 
             rcnn_loss.backward() # calculate gradients
-            print("rcnn_loss:", rcnn_loss)
+            print("rcnn_loss:", rcnn_loss.data)
             # train_loss += loss
             # _, predicted = torch.max(results.data, 1)
             # total += labels.size(0)

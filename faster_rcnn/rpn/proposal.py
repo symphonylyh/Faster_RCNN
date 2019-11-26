@@ -1,3 +1,12 @@
+"""
+Faster R-CNN
+Proposal Layer.
+
+Copyright (c) 2019 Haohang Huang
+Licensed under the MIT License (see LICENSE for details)
+Written by Haohang Huang, November 2019.
+"""
+
 import torch
 import torch.nn as nn
 
@@ -54,7 +63,7 @@ class Proposal(nn.Module):
             else:
                 assert True, "No. of anchors < threshold after NMS, tensor alignment error!"
 
-        keep_indices = torch.cat([torch.LongTensor(l)[None,:] for l in keeps], dim=0) # now we can cat since all list are of same length. Note that we need to add new dimension to make it N x cfg.RPN_POST_NMS_TOP_N size
+        keep_indices = torch.cat([torch.LongTensor(l)[None,:] for l in keeps], dim=0).to(anchors.device) # now we can cat since all list are of same length. Note that we need to add new dimension to make it N x cfg.RPN_POST_NMS_TOP_N size
 
         # index again (same as step 3)
         bbox_score = torch.cat([torch.index_select(bbox_score[i:i+1,:,0:1], dim=1, index=keep_indices[i,:]) for i in torch.arange(bbox_score.size(0))], dim=0)
