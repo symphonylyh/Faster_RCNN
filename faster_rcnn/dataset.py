@@ -17,7 +17,7 @@ from torchvision import transforms, utils
 
 import os
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 class COCODataset(Dataset):
     def __init__(self):
