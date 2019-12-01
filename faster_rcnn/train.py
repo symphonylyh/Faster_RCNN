@@ -47,8 +47,8 @@ def main():
         print("Training...", end='', flush=True)
         model.train()
         train_loss, total, correct = 0, 0, 0
-        #for batch_idx, (images, gt_boxes) in enumerate(trainloader):
-            #images, gt_boxes = images.to(device), gt_boxes.to(device)
+        # for batch_idx, (images, gt_boxes) in enumerate(trainloader):
+        #     images, gt_boxes = images.to(device), gt_boxes.to(device)
         for step in range(10):
 
             optimizer.zero_grad() # reset gradient

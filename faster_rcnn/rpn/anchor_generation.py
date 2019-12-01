@@ -18,7 +18,7 @@ import torch
 import numpy as np
 
 class AnchorGeneration():
-    def __init__(self, img_size=(600, 800), stride=(16,16), scales=[8, 16, 32], ratios=[0.5, 1.0, 2.0]):
+    def __init__(self, img_size, stride, scales, ratios):
         """
         Args:
             img_size [tuple2]: (height, width)
@@ -76,17 +76,3 @@ class AnchorGeneration():
         anchors_all = anchors_all.reshape(-1,4) # N*9 x 4
 
         return torch.from_numpy(anchors_all).type(torch.FloatTensor) # from_numpy will inherit numpy as DoubleTensor, where PyTorch use FloatTensor by default. Note: this variable should later be moved to GPU (see rpn/rpn.py)
-
-if __name__ == '__main__':
-    print(">>> Testing")
-    test = AnchorGeneration()
-    anchors = test._generate_one()
-    print("> Sample set of anchors at one location")
-    print("| y | x | height | width | (y,x) is for upper-left corner\n", anchors)
-
-    print("> All anchors covering the entire image")
-    anchors_all = test.generate_all()
-    print("Shape: ", anchors_all.shape)
-    print("First anchor location:\n", anchors_all[0,:])
-    print("")
-    print("Second anchor location: x should offset by 16\n", anchors_all[1,:])
