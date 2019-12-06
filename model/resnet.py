@@ -241,9 +241,7 @@ def _resnet(arch, block, layers, pretrained, download, progress, **kwargs):
     model = ResNet(block, layers, **kwargs)
     if pretrained:
         if download[0]:
-            state_dict = model_zoo.load_url(model_urls[arch],
-                                                  progress=progress)
-            model.load_state_dict(state_dict, model_dir='./') # download to current directory
+            model.load_state_dict(model_zoo.load_url(model_urls[arch], model_dir='./', progress=progress)) # download to current directory
         else:
             model.load_state_dict(torch.load(download[1]))
     return model

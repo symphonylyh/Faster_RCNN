@@ -10,10 +10,6 @@ Written by Haohang Huang, November 2019.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
-
-import sys
-sys.path.append("..") # to "faster_rcnn/"
 
 from config import Config as cfg
 from .anchor_generation import AnchorGeneration
@@ -72,8 +68,9 @@ class RPN(nn.Module):
         self.conv_bbox_score = nn.Sequential(
             nn.Conv2d(cfg.CONV_OUT_CHANNEL, anchor_types * 2, 1, 1, 0),
             Flatten(2),
-            nn.Softmax(dim=2)
+            #nn.Softmax(dim=2)
         )
+
         # conv layer2 to predict bbox regression coefficients per anchor
         self.conv_bbox_coeff = nn.Sequential(
             nn.Conv2d(cfg.CONV_OUT_CHANNEL, anchor_types * 4, 1, 1, 0),
@@ -124,38 +121,38 @@ class RPN(nn.Module):
         # if training: calculate RPN proposal loss (focus on a good proposal)
         rpn_loss = 0
         if self.training:
-            # 1. classify anchors (fg/bg/dont-care) and calculate target regression coeffs. since bbox_drop is applied, get the kept anchor indices as well
-            labels, target_coeffs, anchors_idx = self.anchor_refine(self.anchors, gt_boxes)
-            # labels: N x X, with 1/0/-1
-            # target_coeffs: N x X x 4
-            # anchors_idx: X x 1
+            # 1. classify anchors (fg/bg/dont-care) and calculate target regression coeffs
+            anchors_idx, fg_mask, target_coeffs = self.anchor_refine(self.anchors, gt_boxes, bbox_coeff)
+            # anchors_idx: N x 256
+            # fg_mask: N x 256
+            # target_coeffs: N x 256 x 4
 
-            # 2. mask out scores and coeffs of anchors after bbox_drop
-            bbox_score_anchors = torch.index_select(bbox_score, dim=1, index=anchors_idx) # N x X x 2
-            bbox_coeff_anchors = torch.index_select(bbox_coeff, dim=1, index=anchors_idx) # N x X x 4
+            # 2. mask out scores and coeffs of fg/bg anchors
+            bbox_score_anchors = torch.cat([torch.index_select(bbox_score[n:n+1,:,:], dim=1, index=anchors_idx[n,:]) for n in range(gt_boxes.size(0))], dim=0)
+            # N x 256 x 2
+            bbox_coeff_anchors = torch.cat([torch.index_select(bbox_coeff[n:n+1,:,:], dim=1, index=anchors_idx[n,:]) for n in range(gt_boxes.size(0))], dim=0)
+            # N x 256 x 4
 
             rpn_class_loss, rpn_bbox_loss = 0, 0
-            for n in range(labels.size(0)): # can't align, loop
-                # 3. calculate classification loss (cross entropy)
-                # mask out foreground + background scores
-                fg_and_bg = labels[n,:] >= 0
-                pred_scores = bbox_score_anchors[n,fg_and_bg,:] # X x 2
-                true_scores = (1 - labels[n,fg_and_bg]).long() # X
-                # a little tricky here:
-                # 1. I used col0 as fg and col1 as bg in my bbox_score result, but the label is fg(1) bg(0), so here I should flip the true labels to make the one-hot locations right
-                # 2. F.cross_entropy() takes multi-dimensional input as N x C and true label N, where C should be the No. of classes and X is No. of samples.
-                rpn_class_loss += F.cross_entropy(pred_scores, true_scores) # by default averaged
+            # 3. calculate classification loss (cross entropy)
+            pred_scores = bbox_score_anchors.view(-1,2) # N*256 x 2
+            true_labels = (~fg_mask).long().flatten() # N*256
+            # a little tricky here:
+            # I used col0 as fg and col1 as bg in my bbox_score result, but the label is fg(1) bg(0), so here I should flip the true labels to make the one-hot locations right
+            rpn_class_loss = F.cross_entropy(pred_scores, true_labels) # average over anchors, and average over N
 
-                # 4. calculate regression loss (smoothL1)
-                # mask out foreground coeffs only
-                fg = labels[n,:] == 1
-                pred_coeffs = bbox_coeff_anchors[n,fg,:].flatten()
-                true_coeffs = target_coeffs[n,fg,:].flatten()
-                rpn_bbox_loss += F.smooth_l1_loss(pred_coeffs, true_coeffs) # by default averaged
-                # built-in smooth L1 can be directly used when we flatten the coefficients. inside/outside weights are not needed since we mask foreground anchors above. Update: flatten is not needed. just make sure input/target dimension matches
+            # 4. calculate regression loss (smoothL1)
+            # mask out foreground coeffs only
+            pred_coeffs = bbox_coeff_anchors.view(-1,4) # N*256 x 4
+            true_coeffs = target_coeffs.view(-1,4) # N*256 x 4
+            raw_loss = F.smooth_l1_loss(pred_coeffs, true_coeffs, reduction='none') # N*256 x 4, we set reduction to 'none' b.c. we need to apply the mask array to extract fg loss only
+            # built-in smooth L1 can be directly used, inside/outside weights are not needed since we mask foreground anchors
+
+            fg_loss = fg_mask.flatten().float() * torch.sum(raw_loss, dim=1)
+            rpn_bbox_loss = fg_loss.sum() / gt_boxes.size(0) # sum over anchors, but average over N
 
             rpn_loss = rpn_class_loss + rpn_bbox_loss
-            rpn_loss /= labels.size(0) # average minibatch
+            print("rpn_class_loss:{:3f}, rpn_bbox_loss:{:3f}".format(rpn_class_loss.item(), rpn_bbox_loss.item()), end=', ', flush=True)
 
         # 5. proposal refinement layer to select some RoIs for training the RPN classification ability
         # if training: calculate RPN classification loss (focus on a per-class good proposal)

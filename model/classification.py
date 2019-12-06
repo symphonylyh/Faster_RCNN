@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-from config import Config as cfg
+from .config import Config as cfg
 
 class Classification(nn.Module):
     """Classification layer.
@@ -26,7 +26,7 @@ class Classification(nn.Module):
         # fc layer1 to predict class score
         self.fc_rois_score = nn.Sequential(
             nn.Linear(2048, cfg.NUM_CLASSES),
-            nn.Softmax(dim=1)
+            #nn.Softmax(dim=1)
         )
 
         # fc layer2 to predict bbox regression coefficients

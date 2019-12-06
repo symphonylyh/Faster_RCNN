@@ -80,7 +80,7 @@ def bbox_drop(bbox, boundary):
         [X x 4]: remain bounding boxes.
         [X, ]: indices of the kept anchors.
     Note:
-        Does not apply to batch bbox due to unalignment.
+        Does not apply to batch bbox due to unalignment after dropping.
     """
     H, W = boundary
     keep = (bbox[:,0] >= 0) & (bbox[:,1] >= 0) & ((bbox[:,0]+bbox[:,2]) < H) & ((bbox[:,1]+bbox[:,3]) < W)

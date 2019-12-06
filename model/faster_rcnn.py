@@ -10,14 +10,13 @@ Written by Haohang Huang, November 2019.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 import numpy as np
 
-from config import Config as cfg
-from resnet import resnet_loader
-from rpn.rpn import RPN
-from roi_pooling import RoIPooling
-from classification import Classification
+from .config import Config as cfg
+from .resnet import resnet_loader
+from .rpn.rpn import RPN
+from .roi_pooling import RoIPooling
+from .classification import Classification
 
 class FasterRCNN(nn.Module):
     """Faster Regional-CNN
@@ -57,6 +56,19 @@ class FasterRCNN(nn.Module):
 
         # Classification network
         self.classification = Classification(self.cnn2) # include cnn2 in the classification network
+
+        # Initialize weights
+        self._init_weight()
+
+    def _init_weight(self):
+        def normal_init(m, mean, std):
+            m.weight.data.normal_(mean, std)
+            m.bias.data.zero_()
+        normal_init(self.rpn.conv[0], 0, 0.01)
+        normal_init(self.rpn.conv_bbox_score[0], 0, 0.01)
+        normal_init(self.rpn.conv_bbox_coeff[0], 0, 0.01)
+        normal_init(self.classification.fc_rois_score[0], 0, 0.01)
+        normal_init(self.classification.fc_rois_coeff, 0, 0.001)
 
     def forward(self, images, gt_boxes, gt_classes):
         """Forward step.
@@ -100,6 +112,7 @@ class FasterRCNN(nn.Module):
             rcnn_bbox_loss = F.smooth_l1_loss(pred_rois_coeffs, gt_rois_coeffs)
 
         # 6. RCNN total loss
-        rcnn_loss = rpn_loss + rcnn_class_loss + rcnn_bbox_loss
+        rcnn_loss = rpn_loss #+ rcnn_class_loss + rcnn_bbox_loss
+        print("rcnn_class_loss:{:3f}, rcnn_bbox_loss:{:3f}".format(rcnn_class_loss, rcnn_bbox_loss), end=', ', flush=True)
 
         return rois, pred_rois_classes, pred_rois_coeffs, rcnn_loss

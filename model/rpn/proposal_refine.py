@@ -10,11 +10,8 @@ Written by Haohang Huang, November 2019.
 import torch
 import torch.nn as nn
 
-import sys
-sys.path.append("..") # to "faster_rcnn/"
-
 from config import Config as cfg
-from rpn import utils # rpn/utils
+from . import utils
 
 class ProposalRefine(nn.Module):
     """Proposal refinement layer. Select RoI proposals that can be used to train the RPN classification loss.
@@ -53,6 +50,14 @@ class ProposalRefine(nn.Module):
         # bg_roi_labels: N x C boolean, True when this roi is bg
         # bg_gt_match_idx: we don't care about this, since no match for bg RoIs
 
+        # edge case: when there is NO bg RoIs at all...lower the threshold
+        bg_roi_labels_backup, _ = torch.max((overlaps < cfg.RPN_BG_ROI_OVERLAP_LOW) & (overlaps >= 0), dim=2)
+        for n in range(gt_boxes.size(0)):
+            bg_idx = bg_roi_labels[n,:].nonzero() # No. of True
+            num_bg = bg_idx.size(0)
+            if num_bg == 0:
+                bg_roi_labels[n,:] = bg_roi_labels_backup[n,:]
+
         rois_selected_idx = torch.zeros(gt_boxes.size(0), cfg.RPN_TOTAL_ROIS, dtype=torch.long).to(rois.device) # N x RPN_TOTAL_ROIS (R), index in C (RoI)
         gt_match_idx = torch.zeros(gt_boxes.size(0), cfg.RPN_TOTAL_ROIS, dtype=torch.long).to(rois.device) # N x RPN_TOTAL_ROIS (R), index in B (matched gt box)
 
@@ -69,10 +74,11 @@ class ProposalRefine(nn.Module):
             num_bg = bg_idx.size(0)
             # bg_gt_idx doesn't make sense for bg (class is always 0)
 
+            #print("num_fg:", num_fg, "num_bg", num_bg)
             # excessive foreground
             if num_fg > max_fg: # drop excessive
-                rois_selected_idx[n,:max_fg] = fg_idx[:max_fg]
-                gt_match_idx[n,:max_fg] = fg_gt_idx[:max_fg]
+                rois_selected_idx[n,:max_fg] = fg_idx[:max_fg].flatten()
+                gt_match_idx[n,:max_fg] = fg_gt_idx[:max_fg].flatten()
             elif num_fg < max_fg: # fill with duplicated fg ROIs
                 fill_idx = torch.cat([torch.arange(0,num_fg), torch.randint(0,num_fg,(max_fg-num_fg,))])
                 rois_selected_idx[n,:max_fg] = fg_idx[fill_idx].flatten()
@@ -80,7 +86,7 @@ class ProposalRefine(nn.Module):
 
             # excessive background
             if num_bg > max_bg: # drop excessive
-                rois_selected_idx[n,max_fg:] = bg_idx[:max_bg]
+                rois_selected_idx[n,max_fg:] = bg_idx[:max_bg].flatten()
             elif num_bg < max_bg: # fill with duplicated bg ROIs
                 fill_idx = torch.cat([torch.arange(0,num_bg), torch.randint(0,num_bg,(max_bg-num_bg,))])
                 rois_selected_idx[n,max_fg:] = bg_idx[fill_idx].flatten()

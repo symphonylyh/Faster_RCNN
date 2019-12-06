@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-from config import Config as cfg
+from .config import Config as cfg
 
 class RoIPooling(nn.Module):
     """RoI pooling layer. Now we have R RoIs (in original image dimension) from the RPN network, and 1024 channel feature maps (in H/16 x W/16 dimension) from the CNN network. We want to classify each RoI using ResNet layers (conv & fc), so we should regularize the RoI shapes into fixed-size features. This is RoI pooling. To handle pixel quantized error, RoI Align is later adopted in Mask R-CNN.

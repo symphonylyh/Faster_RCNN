@@ -10,11 +10,8 @@ Written by Haohang Huang, November 2019.
 import torch
 import torch.nn as nn
 
-import sys
-sys.path.append("..") # to "faster_rcnn/"
-
 from config import Config as cfg
-from rpn import utils # rpn/utils
+from . import utils
 
 class Proposal(nn.Module):
     """Proposal layer.
