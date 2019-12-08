@@ -55,10 +55,14 @@ class Proposal(nn.Module):
         if we use a small RPN_POST_NMS_TOP_N, they may be truncated and aligned; if we use a large RPN_POST_NMS_TOP_N and not aligned, what should we do? should we pad? it depends on later steps, let me first use a small RPN_POST_NMS_TOP_N to truncate and check assertion here.
         """
         for n in torch.arange(len(keeps)):
-            if len(keeps[n]) >= cfg.RPN_POST_NMS_TOP_N:
+            max_rois = cfg.RPN_POST_NMS_TOP_N
+            num_rois = len(keeps[n])
+            if num_rois > max_rois: # drop excessive RoIs
                 keeps[n] = keeps[n][:cfg.RPN_POST_NMS_TOP_N]
-            else:
-                assert True, "No. of anchors < threshold after NMS, tensor alignment error!"
+            elif num_rois < max_rois: # fill with duplicated RoIs
+                #assert False, "No. of anchors < threshold after NMS, tensor alignment error!"
+                fill_idx = torch.cat([torch.arange(0,num_rois), torch.randint(0,num_rois,(max_rois-num_rois,))])
+                keeps[n] = [keeps[n][i] for i in fill_idx]
 
         keep_indices = torch.cat([torch.LongTensor(l)[None,:] for l in keeps], dim=0).to(anchors.device) # now we can cat since all list are of same length. Note that we need to add new dimension to make it N x cfg.RPN_POST_NMS_TOP_N size
 
@@ -68,16 +72,6 @@ class Proposal(nn.Module):
         bbox = torch.cat([torch.index_select(bbox[i:i+1,:,:], dim=1, index=keep_indices[i,:]) for i in torch.arange(bbox.size(0))], dim=0)
 
         return bbox_score, bbox
-
-        # should we pad???
-        # for n in torch.arange(bbox.size(0)):
-        #     keep = torch.LongTensor(keeps[n])
-        #     scores = bbox_score[n,keep,0:1] # X x 1
-        #     boxes = bbox[n,keep,:] # X x 4
-        #     # pad to align
-        #     if len(keep) < align:
-        #         scores[:]
-        # return bbox_score, bbox, keeps
 
 if __name__ == '__main__':
     print(">>> Testing")

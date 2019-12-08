@@ -27,7 +27,7 @@ class Flatten(nn.Module):
     def forward(self, x):
         """Input x is N x (9*2) x H/16 x W/16, we want to reshape to N x (H/16*W/16*9) x 2. N is minibatch size, self.last_dim can be 2 or 4 in our context.
         """
-        return x.view(x.size(0), -1, self.last_dim)
+        return x.permute(0,2,3,1).contiguous().view(x.size(0), -1, self.last_dim)
 
 class RPN(nn.Module):
     """Regional Proposal Network.
@@ -102,7 +102,7 @@ class RPN(nn.Module):
             rois [N x R x 4]: R selected RoIs proposed by Proposal layer (inference) or Proposal + ProposalRefine layers (training)
             rois_labels [N x R]: class labels for RoIs, 0 for background. None if inference
             rois_coeffs [N x R x 4]: target coefficients for RoIs, 0 for bg. None if inference
-            rpn_loss [float]: RPN loss value
+            *_loss [float]: loss values
         """
         # 1. common conv
         out = self.conv(feature_map)
@@ -114,56 +114,56 @@ class RPN(nn.Module):
 
         # 3. proposal layer for generating RoIs
         roi_scores, rois = self.proposal(self.anchors, bbox_score, bbox_coeff)
-        # roi_scores: N x M x 1
+        # roi_scores: N x M x 1 (never used after)
         # rois: N x M x 4
 
         # 4. anchor refinement layer to select some anchors for training the RPN proposal ability
         # if training: calculate RPN proposal loss (focus on a good proposal)
         rpn_loss = 0
         if self.training:
-            # 1. classify anchors (fg/bg/dont-care) and calculate target regression coeffs
-            anchors_idx, fg_mask, target_coeffs = self.anchor_refine(self.anchors, gt_boxes, bbox_coeff)
-            # anchors_idx: N x 256
-            # fg_mask: N x 256
-            # target_coeffs: N x 256 x 4
+            # 1. classify anchors (fg/bg/dont-care) and calculate target regression coeffs. since bbox_drop is applied, track the kept anchor indices as well
+            labels, target_coeffs, anchors_idx = self.anchor_refine(self.anchors, gt_boxes)
+            # labels: N x X, with 1/0/-1
+            # target_coeffs: N x X x 4
+            # anchors_idx: X x 1
 
-            # 2. mask out scores and coeffs of fg/bg anchors
-            bbox_score_anchors = torch.cat([torch.index_select(bbox_score[n:n+1,:,:], dim=1, index=anchors_idx[n,:]) for n in range(gt_boxes.size(0))], dim=0)
-            # N x 256 x 2
-            bbox_coeff_anchors = torch.cat([torch.index_select(bbox_coeff[n:n+1,:,:], dim=1, index=anchors_idx[n,:]) for n in range(gt_boxes.size(0))], dim=0)
-            # N x 256 x 4
+            # 2. mask out scores and coeffs of anchors after bbox_drop
+            bbox_score_anchors = torch.index_select(bbox_score, dim=1, index=anchors_idx) # N x X x 2
+            bbox_coeff_anchors = torch.index_select(bbox_coeff, dim=1, index=anchors_idx) # N x X x 4
 
             rpn_class_loss, rpn_bbox_loss = 0, 0
-            # 3. calculate classification loss (cross entropy)
-            pred_scores = bbox_score_anchors.view(-1,2) # N*256 x 2
-            true_labels = (~fg_mask).long().flatten() # N*256
-            # a little tricky here:
-            # I used col0 as fg and col1 as bg in my bbox_score result, but the label is fg(1) bg(0), so here I should flip the true labels to make the one-hot locations right
-            rpn_class_loss = F.cross_entropy(pred_scores, true_labels) # average over anchors, and average over N
+            for n in range(labels.size(0)): # can't align among batch, loop
+                # 3. calculate classification loss (cross entropy)
+                # mask out foreground + background scores
+                fg_and_bg = labels[n,:] >= 0 # denote fg+bg = Y
+                pred_scores = bbox_score_anchors[n,fg_and_bg,:] # Y x 2
+                true_scores = (1 - labels[n,fg_and_bg]).long() # Y
+                # a little tricky here:
+                # 1. I used col0 as fg and col1 as bg in my bbox_score result, but the label is fg(1) bg(0), so here I should flip the true labels to make the one-hot locations right
+                # 2. F.cross_entropy() takes multi-dimensional input as N x C and true label N, where C should be the No. of classes and X is No. of samples.
+                rpn_class_loss += F.cross_entropy(pred_scores, true_scores) # by default averaged
 
-            # 4. calculate regression loss (smoothL1)
-            # mask out foreground coeffs only
-            pred_coeffs = bbox_coeff_anchors.view(-1,4) # N*256 x 4
-            true_coeffs = target_coeffs.view(-1,4) # N*256 x 4
-            raw_loss = F.smooth_l1_loss(pred_coeffs, true_coeffs, reduction='none') # N*256 x 4, we set reduction to 'none' b.c. we need to apply the mask array to extract fg loss only
-            # built-in smooth L1 can be directly used, inside/outside weights are not needed since we mask foreground anchors
+                # 4. calculate regression loss (smoothL1)
+                # mask out foreground coeffs only
+                fg = labels[n,:] == 1 # denote fg = Z
+                pred_coeffs = bbox_coeff_anchors[n,fg,:] # Z x 4
+                true_coeffs = target_coeffs[n,fg,:] # Z x 4
+                rpn_bbox_loss += F.smooth_l1_loss(pred_coeffs, true_coeffs)
 
-            fg_loss = fg_mask.flatten().float() * torch.sum(raw_loss, dim=1)
-            rpn_bbox_loss = fg_loss.sum() / gt_boxes.size(0) # sum over anchors, but average over N
-
+            rpn_class_loss /= gt_boxes.size(0) # average minibatch
+            rpn_bbox_loss /= gt_boxes.size(0)
             rpn_loss = rpn_class_loss + rpn_bbox_loss
-            print("rpn_class_loss:{:3f}, rpn_bbox_loss:{:3f}".format(rpn_class_loss.item(), rpn_bbox_loss.item()), end=', ', flush=True)
 
         # 5. proposal refinement layer to select some RoIs for training the RPN classification ability
         # if training: calculate RPN classification loss (focus on a per-class good proposal)
         rois_labels, rois_coeffs = None, None
         if self.training:
             rois, rois_labels, rois_coeffs = self.proposal_refine(rois, gt_boxes, gt_classes)
-            # rois: N x R x 4, selected RoIs. Overwrite original rois
+            # rois: N x R x 4, selected RoIs. Overwrite original rois while training, this "rois" will be passed to classification layer
             # rois_labels: N x R, R is cfg.RPN_TOTAL_ROIS
             # rois_coeffs: N x R x 21*4
 
-        return rois, rois_labels, rois_coeffs, rpn_loss
+        return rois, rois_labels, rois_coeffs, rpn_class_loss, rpn_bbox_loss, rpn_loss
 
 if __name__ == '__main__':
     print(">>> Testing")

@@ -69,6 +69,10 @@ def bbox_clip(bbox, boundary):
     bbox_new[:,:,2] = (bbox[:,:,0]+bbox[:,:,2]).clamp(0, H - 1) - bbox_new[:,:,0] # (y+h) is the lower-right corner, clamp it to get new corner point, and substract the new upper-left point to calculate new height
     bbox_new[:,:,3] = (bbox[:,:,1]+bbox[:,:,3]).clamp(0, W - 1) - bbox_new[:,:,1] # x+w
 
+    # (Bug fix) bbox clip may lead to (h,w) = 0 type of box, force the height and width to be 1 to suppress error when calculating IoU (area = 0!!!)
+    bbox_new[:,:,2][bbox_new[:,:,2]==0] = 1
+    bbox_new[:,:,3][bbox_new[:,:,3]==0] = 1
+
     return bbox_new
 
 def bbox_drop(bbox, boundary):

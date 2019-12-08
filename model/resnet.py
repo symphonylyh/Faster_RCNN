@@ -1,6 +1,6 @@
 """
 Faster R-CNN
-Residual Network.
+Residual Network. Modified from PyTorch's official implementation.
 
 Copyright (c) 2019 Haohang Huang
 Licensed under the MIT License (see LICENSE for details)

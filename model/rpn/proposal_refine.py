@@ -111,4 +111,7 @@ class ProposalRefine(nn.Module):
                 l = rois_labels[n,r]
                 rois_coeffs_all[n,r,l*4:(l+1)*4] = rois_coeffs[n,r,:]
 
+        """Note:
+        In author's implementation, there is an empirical mean & std (called BBOX_NORMALIZE_MEANS & BBOX_NORMALIZE_STDEVS) applied to the 'rois_coeffs'. I guess it's for better matching with the pred_rois_coeffs. I didn't do that here because I think that's cheating.
+        """
         return rois_boxes, rois_labels, rois_coeffs_all

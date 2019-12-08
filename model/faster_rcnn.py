@@ -10,7 +10,6 @@ Written by Haohang Huang, November 2019.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 
 from .config import Config as cfg
 from .resnet import resnet_loader
@@ -77,19 +76,20 @@ class FasterRCNN(nn.Module):
             gt_boxes [N x X x 4]: ground-truth boxes in each image. Only used in AnchorRefine & ProposalRefine layers.
             gt_classes [N x X]: classes of ground-truth boxes in each image. Only used in ProposalRefine layer.
         Returns:
-            rois [N x R x 4]:
-            pred_rois_classes [N x R]:
-            pred_rois_coeffs [N x R x 21*4]:
-            rcnn_loss [float]: RCNN total loss
+            rois [N x R x 4]: Proposed RoIs.
+            pred_rois_scores [N x R x 21]: RoI class scores.
+            pred_rois_coeffs [N x R x 21*4]: RoI class-specific bbox coefficients. (to be later applied during evaluation/inference)
+            *_loss [float]: loss values
         """
         # 1. head CNN network (ResNet)
         feature_map = self.cnn1(images) # N x C x H x W
 
         # 2. RPN network
-        rois, gt_rois_labels, gt_rois_coeffs, rpn_loss = self.rpn(feature_map, gt_boxes, gt_classes)
+        rois, gt_rois_labels, gt_rois_coeffs, rpn_class_loss, rpn_bbox_loss, rpn_loss = self.rpn(feature_map, gt_boxes, gt_classes)
         # rois: N x R x 4
-        # gt_rois_labels: N x R
-        # gt_rois_coeffs: N x R x 21*4
+        # gt_rois_labels: N x R (None during inference)
+        # gt_rois_coeffs: N x R x 21*4 (None during inference)
+        # *loss: scalar (0 during inference)
 
         # 3. crop pooling the RoIs
         crops = self.pooling(rois, feature_map) # N x R x C x 7 x 7
@@ -98,7 +98,6 @@ class FasterRCNN(nn.Module):
         pred_rois_scores, pred_rois_coeffs = self.classification(crops)
         # pred_rois_scores: N x R x 21
         # pred_rois_coeffs: N x R x 21*4
-        pred_rois_classes = torch.argmax(pred_rois_scores, dim=2) # N x R
 
         # 5. calculate classification loss
         rcnn_class_loss, rcnn_bbox_loss = 0, 0
@@ -109,10 +108,11 @@ class FasterRCNN(nn.Module):
             # F.cross_entropy() can take multi-dimensional input but only allow class be the 2nd dimension, i.e. input should be N x 21 x R, labels should be N x R
 
             # bbox regression loss
+            pred_rois_coeffs = pred_rois_coeffs.view(-1, pred_rois_coeffs.size(2))
+            gt_rois_coeffs = gt_rois_coeffs.view(-1, gt_rois_coeffs.size(2))
             rcnn_bbox_loss = F.smooth_l1_loss(pred_rois_coeffs, gt_rois_coeffs)
 
         # 6. RCNN total loss
-        rcnn_loss = rpn_loss #+ rcnn_class_loss + rcnn_bbox_loss
-        print("rcnn_class_loss:{:3f}, rcnn_bbox_loss:{:3f}".format(rcnn_class_loss, rcnn_bbox_loss), end=', ', flush=True)
+        rcnn_loss = rpn_loss + rcnn_class_loss + rcnn_bbox_loss
 
-        return rois, pred_rois_classes, pred_rois_coeffs, rcnn_loss
+        return rois, pred_rois_scores, pred_rois_coeffs, rpn_class_loss, rpn_bbox_loss, rcnn_class_loss, rcnn_bbox_loss, rcnn_loss

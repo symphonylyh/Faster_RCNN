@@ -5,3 +5,5 @@
 
 datasets/**
 !datasets/*.py
+
+logs/**
