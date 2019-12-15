@@ -110,7 +110,7 @@ class FasterRCNN(nn.Module):
             # bbox regression loss
             pred_rois_coeffs = pred_rois_coeffs.view(-1, pred_rois_coeffs.size(2))
             gt_rois_coeffs = gt_rois_coeffs.view(-1, gt_rois_coeffs.size(2))
-            rcnn_bbox_loss = F.smooth_l1_loss(pred_rois_coeffs, gt_rois_coeffs)
+            rcnn_bbox_loss = F.smooth_l1_loss(pred_rois_coeffs, gt_rois_coeffs, reduction='none').sum(dim=1).mean() # Caveat, smooth_l1_loss will by default average over all ELEMENTS rather than batch size N (PyTorch doc is a little misleading...). So we should set reduction='none' and manually sum along 21*4 dim and average along N dim (otherwise rcnn_bbox_loss is very small). 
 
         # 6. RCNN total loss
         rcnn_loss = rpn_loss + rcnn_class_loss + rcnn_bbox_loss

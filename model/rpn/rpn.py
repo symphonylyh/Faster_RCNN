@@ -119,7 +119,7 @@ class RPN(nn.Module):
 
         # 4. anchor refinement layer to select some anchors for training the RPN proposal ability
         # if training: calculate RPN proposal loss (focus on a good proposal)
-        rpn_loss = 0
+        rpn_loss, rpn_class_loss, rpn_bbox_loss = 0, 0, 0
         if self.training:
             # 1. classify anchors (fg/bg/dont-care) and calculate target regression coeffs. since bbox_drop is applied, track the kept anchor indices as well
             labels, target_coeffs, anchors_idx = self.anchor_refine(self.anchors, gt_boxes)
@@ -131,7 +131,7 @@ class RPN(nn.Module):
             bbox_score_anchors = torch.index_select(bbox_score, dim=1, index=anchors_idx) # N x X x 2
             bbox_coeff_anchors = torch.index_select(bbox_coeff, dim=1, index=anchors_idx) # N x X x 4
 
-            rpn_class_loss, rpn_bbox_loss = 0, 0
+
             for n in range(labels.size(0)): # can't align among batch, loop
                 # 3. calculate classification loss (cross entropy)
                 # mask out foreground + background scores
