@@ -5,14 +5,17 @@
 
 ## Installation Guide
 Clone the repository
+
 `git clone https://github.com/symphonylyh/Faster_RCNN.git`
 
 Pre-trained ResNet101 and PASCAL VOC 2007 Dataset will be automatically downloaded.
 
 Train the network or resume training from last saved model.
+
 `python train.py` or `python train.py --resume`
 
 Model checkpoint and training statistics will be saved in `/logs`. Tensorboard can be used to visualize the training process
+
 `tensorboard --logdir=logs`
 
 ### PyTorch Programming Notes
