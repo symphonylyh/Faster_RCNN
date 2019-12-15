@@ -13,7 +13,7 @@ Generates training targets/labels for each anchor. Classification labels are 1 (
 Generates training targets/labels for each object proposal: classification labels 0 - K (bg or object class 1, ... , K)
 and bbox regression targets in that case that the label is > 0. Refines the class-specific proposal and improves the quality of proposals.
 
-#### `model.py`
+#### `rpn.py`
 The main RPN model.
 
 #### `utils.py`
@@ -24,4 +24,4 @@ Common bounding box operations.
 * Other versions generate anchors in both proposal layer and anchor target layer, which is redundant. I cached the generated anchors in RPN and pass to both layers.
 * what's the point of setting foreground/background fraction?
 * no need to unmap, just return the indices of kept anchor indices after bbox_drop
-* jwang's implementation in wrong during the calculation of classification loss in RPN loss. It uses the don't care class as well, where we should rather mask out foreground + background anchors only.
+* jwang's implementation is wrong during the calculation of classification loss in RPN loss. It uses the don't care class as well, where we should rather mask out foreground + background anchors only.
